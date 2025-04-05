@@ -1,0 +1,55 @@
+version: '3.8'
+
+services:
+  controller:
+    build: 
+      context: .
+      dockerfile: ./controller/Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./controller:/app/controller
+      - ./utils:/app/utils
+    environment:
+     - API_KEY=supersecret
+
+  node1:
+    build:
+      context: ./nodes
+    volumes:
+      - ./nodes/node1:/app
+      - node1_data:/app/storage
+    environment:
+      - NODE_PORT=9001
+      - CONTROLLER_URL=http://controller:8000
+    ports:
+      - "9001:9001"
+
+  node2:
+    build:
+      context: ./nodes
+    volumes:
+      - ./nodes/node2:/app
+      - node2_data:/app/storage
+    environment:
+      - NODE_PORT=9002
+      - CONTROLLER_URL=http://controller:8000
+    ports:
+      - "9002:9002"
+
+  node3:
+    build:
+      context: ./nodes
+    volumes:
+      - ./nodes/node3:/app
+      - node3_data:/app/storage
+    environment:
+      - NODE_PORT=9003
+      - CONTROLLER_URL=http://controller:8000
+    ports:
+      - "9003:9003"
+
+volumes:
+  node1_data:
+  node2_data:
+  node3_data:
