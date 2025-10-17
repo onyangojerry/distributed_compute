@@ -14,7 +14,7 @@ function App() {
   const fetchFiles = () => {
     axios.get("http://localhost:8000/files")
       .then(res => setFiles(res.data.files || []))
-      .catch(err => console.error("❌ Failed to load files:", err));
+      .catch(err => console.error("Failed to load files:", err));
   };
 
   const handleUploadSuccess = (newFile) => {
@@ -24,7 +24,7 @@ function App() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-100 to-white p-6">
       <h1 className="text-4xl font-extrabold text-center text-indigo-600 mb-10">
-        🚀 Distributed File Storage
+        A Distributed and fault-tolerant File Storage
       </h1>
       <UploadForm onUploadSuccess={handleUploadSuccess} />
       <FileList files={files} />
