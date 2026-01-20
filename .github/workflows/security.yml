@@ -1,0 +1,85 @@
+name: Security Scan
+
+on:
+  schedule:
+    - cron: '0 2 * * 1'  # Weekly on Monday at 2 AM UTC
+  workflow_dispatch:
+
+jobs:
+  dependency-scan:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+        
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install safety
+        
+    - name: Python dependency vulnerability scan
+      run: safety check --json --output safety-report.json || true
+      
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        
+    - name: Install Node.js dependencies
+      working-directory: ./web-ui
+      run: npm ci
+      
+    - name: Node.js dependency vulnerability scan
+      working-directory: ./web-ui
+      run: npm audit --audit-level moderate --json > npm-audit-report.json || true
+      
+    - name: Upload security scan results
+      uses: actions/upload-artifact@v3
+      with:
+        name: security-scan-results
+        path: |
+          safety-report.json
+          web-ui/npm-audit-report.json
+
+  docker-security-scan:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Build Docker images
+      run: |
+        docker build -t controller:latest ./controller
+        docker build -t node:latest ./nodes
+        
+    - name: Run Trivy vulnerability scanner on controller image
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: 'controller:latest'
+        format: 'sarif'
+        output: 'trivy-controller.sarif'
+        
+    - name: Run Trivy vulnerability scanner on node image
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: 'node:latest'
+        format: 'sarif'
+        output: 'trivy-node.sarif'
+        
+    - name: Upload Trivy scan results to GitHub Security tab
+      uses: github/codeql-action/upload-sarif@v2
+      with:
+        sarif_file: 'trivy-controller.sarif'
+        
+    - name: Upload Trivy scan results to GitHub Security tab
+      uses: github/codeql-action/upload-sarif@v2
+      with:
+        sarif_file: 'trivy-node.sarif'

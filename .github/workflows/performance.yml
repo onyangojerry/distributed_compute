@@ -1,0 +1,178 @@
+name: Performance Monitoring
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'  # Every 6 hours
+  workflow_dispatch:
+    inputs:
+      duration:
+        description: 'Test duration in minutes'
+        required: false
+        default: '5'
+      users:
+        description: 'Number of concurrent users'
+        required: false
+        default: '50'
+
+jobs:
+  performance-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install locust
+        
+    - name: Start services
+      run: |
+        docker compose up -d --build
+        sleep 30
+        
+    - name: Wait for services to be ready
+      run: |
+        timeout 120 bash -c 'until curl -f http://localhost:8000/health; do sleep 2; done'
+        
+    - name: Run upload performance test
+      run: |
+        locust -f tests/load/upload_test.py \
+          --host=http://localhost:8000 \
+          --headless \
+          --users ${{ github.event.inputs.users || '50' }} \
+          --spawn-rate 5 \
+          --run-time ${{ github.event.inputs.duration || '5' }}m \
+          --html upload-performance-report.html \
+          --csv upload-performance
+          
+    - name: Run download performance test
+      run: |
+        locust -f tests/load/download_test.py \
+          --host=http://localhost:8000 \
+          --headless \
+          --users ${{ github.event.inputs.users || '50' }} \
+          --spawn-rate 5 \
+          --run-time ${{ github.event.inputs.duration || '5' }}m \
+          --html download-performance-report.html \
+          --csv download-performance
+          
+    - name: Collect system metrics
+      run: |
+        docker stats --no-stream --format "table {{.Container}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.MemPerc}}\t{{.NetIO}}\t{{.BlockIO}}" > system-metrics.txt
+        
+    - name: Generate performance summary
+      run: |
+        echo "## Performance Test Summary" > performance-summary.md
+        echo "- **Test Duration**: ${{ github.event.inputs.duration || '5' }} minutes" >> performance-summary.md
+        echo "- **Concurrent Users**: ${{ github.event.inputs.users || '50' }}" >> performance-summary.md
+        echo "- **Test Date**: $(date)" >> performance-summary.md
+        echo "" >> performance-summary.md
+        echo "### System Metrics" >> performance-summary.md
+        echo "\`\`\`" >> performance-summary.md
+        cat system-metrics.txt >> performance-summary.md
+        echo "\`\`\`" >> performance-summary.md
+        
+    - name: Upload performance test results
+      uses: actions/upload-artifact@v3
+      with:
+        name: performance-test-results-${{ github.run_number }}
+        path: |
+          upload-performance-report.html
+          download-performance-report.html
+          upload-performance_*.csv
+          download-performance_*.csv
+          system-metrics.txt
+          performance-summary.md
+          
+    - name: Comment PR with performance results
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const fs = require('fs');
+          const summary = fs.readFileSync('performance-summary.md', 'utf8');
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: summary
+          });
+          
+    - name: Cleanup
+      if: always()
+      run: docker compose down -v
+
+  benchmark-comparison:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    
+    steps:
+    - name: Checkout PR code
+      uses: actions/checkout@v4
+      
+    - name: Run benchmark on PR branch
+      run: |
+        docker compose up -d --build
+        sleep 30
+        pip install locust
+        locust -f tests/load/benchmark.py --host=http://localhost:8000 --headless --users 10 --spawn-rate 2 --run-time 2m --csv pr-benchmark
+        docker compose down -v
+        
+    - name: Checkout main branch
+      uses: actions/checkout@v4
+      with:
+        ref: main
+        
+    - name: Run benchmark on main branch
+      run: |
+        docker compose up -d --build
+        sleep 30
+        locust -f tests/load/benchmark.py --host=http://localhost:8000 --headless --users 10 --spawn-rate 2 --run-time 2m --csv main-benchmark
+        docker compose down -v
+        
+    - name: Compare benchmarks
+      run: |
+        python -c "
+        import csv
+        
+        def read_stats(filename):
+            with open(filename, 'r') as f:
+                reader = csv.DictReader(f)
+                return next(reader)
+        
+        pr_stats = read_stats('pr-benchmark_stats.csv')
+        main_stats = read_stats('main-benchmark_stats.csv')
+        
+        pr_avg = float(pr_stats['Average Response Time'])
+        main_avg = float(main_stats['Average Response Time'])
+        
+        change = ((pr_avg - main_avg) / main_avg) * 100
+        
+        print(f'Performance comparison:')
+        print(f'Main branch average response time: {main_avg:.2f}ms')
+        print(f'PR branch average response time: {pr_avg:.2f}ms')
+        print(f'Change: {change:+.2f}%')
+        
+        with open('benchmark-comparison.txt', 'w') as f:
+            f.write(f'Main: {main_avg:.2f}ms, PR: {pr_avg:.2f}ms, Change: {change:+.2f}%')
+        "
+        
+    - name: Comment benchmark results
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const fs = require('fs');
+          const comparison = fs.readFileSync('benchmark-comparison.txt', 'utf8');
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: `## Performance Benchmark Results\n\n${comparison}`
+          });

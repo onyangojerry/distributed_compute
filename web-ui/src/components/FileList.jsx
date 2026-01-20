@@ -1,29 +1,18 @@
 // src/components/FileList.jsx
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import axios from "axios";
 import { FiDownload, FiTrash2, FiEye } from "react-icons/fi";
 
-export default function FileList() {
-  const [files, setFiles] = useState([]);
+export default function FileList({ files, onFileDeleted }) {
   const [selected, setSelected] = useState(null);
-
-  const fetchFiles = async () => {
-    try {
-      const res = await axios.get("http://localhost:8000/files");
-      setFiles(res.data.files || []);
-    } catch (err) {
-      console.error("❌ Failed to load files:", err);
-    }
-  };
-
-  useEffect(() => {
-    fetchFiles();
-  }, []);
 
   const handleDelete = async (filename) => {
     try {
       await axios.delete(`http://localhost:8000/delete/${filename}`);
-      setFiles(files.filter((f) => f !== filename));
+      // Notify parent component about the deletion
+      if (onFileDeleted) {
+        onFileDeleted(filename);
+      }
     } catch (err) {
       console.error("❌ Delete failed:", err);
     }
