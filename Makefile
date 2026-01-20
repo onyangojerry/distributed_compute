@@ -46,6 +46,51 @@ logs: ## Show logs from all services
 status: ## Show status of all services
 	$(DOCKER_COMPOSE) ps
 
+# Dependencies
+.PHONY: install
+install: ## Install all dependencies
+	@echo "$(BLUE)Installing Python dependencies...$(RESET)"
+	$(PYTHON) -m pip install --upgrade pip
+	pip install -r requirements.txt
+	@echo "$(BLUE)Installing development dependencies...$(RESET)"
+	pip install -r requirements-dev.txt
+
+.PHONY: install-prod
+install-prod: ## Install only production dependencies
+	@echo "$(BLUE)Installing production dependencies...$(RESET)"
+	$(PYTHON) -m pip install --upgrade pip
+	pip install -r requirements.txt
+
+.PHONY: verify
+verify: ## Verify all dependencies and configuration
+	@echo "$(BLUE)Verifying system dependencies...$(RESET)"
+	$(PYTHON) scripts/verify_dependencies.py
+
+# Code Quality
+.PHONY: format
+format: ## Format code with black
+	@echo "$(BLUE)Formatting code...$(RESET)"
+	black controller/ nodes/ utils/ tests/
+
+.PHONY: lint
+lint: ## Lint code with flake8
+	@echo "$(BLUE)Linting code...$(RESET)"
+	flake8 controller/ nodes/ utils/ tests/ --max-line-length=88 --extend-ignore=E203,W503
+
+.PHONY: typecheck
+typecheck: ## Type check with mypy
+	@echo "$(BLUE)Type checking...$(RESET)"
+	mypy controller/ nodes/ utils/ --ignore-missing-imports
+
+.PHONY: security
+security: ## Run security checks
+	@echo "$(BLUE)Running security checks...$(RESET)"
+	safety check
+	bandit -r controller/ nodes/ utils/ -f json
+
+.PHONY: quality
+quality: format lint typecheck ## Run all code quality checks
+
 # Testing
 .PHONY: test
 test: test-unit test-integration ## Run all tests
