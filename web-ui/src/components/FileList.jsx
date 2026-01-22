@@ -1,6 +1,6 @@
 // src/components/FileList.jsx
 import { useState } from "react";
-import axios from "axios";
+import { api } from "../api";
 import { FiDownload, FiTrash2, FiEye } from "react-icons/fi";
 
 export default function FileList({ files, onFileDeleted }) {
@@ -8,7 +8,7 @@ export default function FileList({ files, onFileDeleted }) {
 
   const handleDelete = async (filename) => {
     try {
-      await axios.delete(`http://localhost:8000/delete/${filename}`);
+      await api.delete(`/delete/${filename}`);
       // Notify parent component about the deletion
       if (onFileDeleted) {
         onFileDeleted(filename);
@@ -35,7 +35,7 @@ export default function FileList({ files, onFileDeleted }) {
               {selected === file && (
                 <div className="flex space-x-4">
                   <a
-                    href={`http://localhost:8000/download/${file}`}
+                    href={`${api.defaults.baseURL}/download/${file}`}
                     className="text-green-600 hover:text-green-800"
                     target="_blank"
                     rel="noopener noreferrer"
@@ -43,7 +43,7 @@ export default function FileList({ files, onFileDeleted }) {
                     <FiEye size={18} title="Open" />
                   </a>
                   <a
-                    href={`http://localhost:8000/download/${file}`}
+                    href={`${api.defaults.baseURL}/download/${file}`}
                     className="text-blue-600 hover:text-blue-800"
                     download
                   >
