@@ -1,23 +1,34 @@
 # Distributed File Storage System
 
-A fault-tolerant distributed file storage system designed for high availability, scalability, and performance. The system implements file chunking, multi-node replication, automatic failover, and provides both REST API and modern web interface for file management.
+Fault-tolerant file storage with chunking, replication, and a simple REST API + web UI.
 
-## Table of Contents
+## Quick Start
 
-- [Architecture Overview](#architecture-overview)
-- [Features](#features)
-- [System Requirements](#system-requirements)
-- [Installation and Setup](#installation-and-setup)
-- [API Documentation](#api-documentation)
-- [User Interface](#user-interface)
-- [System Workflows](#system-workflows)
-- [Monitoring and Health Checks](#monitoring-and-health-checks)
-- [Configuration](#configuration)
-- [Testing](#testing)
-- [Performance and Scalability](#performance-and-scalability)
-- [Troubleshooting](#troubleshooting)
-- [Development](#development)
-- [Contributing](#contributing)
+1. Start backend services:
+```bash
+make dev-detached
+```
+2. Run web UI (dev):
+```bash
+cd web-ui && npm ci && npx vite --port 5173
+```
+3. Upload and manage files at: http://localhost:5173
+
+## Docs
+See the full documentation in [docs/README.md](docs/README.md): standards, roadmap, testing, UX/UI implementation, and more.
+
+## Project Structure
+- Controller (FastAPI): file chunking, replication, metadata
+- Nodes (Uvicorn): chunk storage and retrieval
+- Web UI (Vite/React): upload, list, actions
+
+## Development
+- Python deps: `make install`
+- Tests: `make test` / `make test-integration` / `make test-performance`
+- Security: `make test-security`
+
+## License
+See [LICENSE](LICENSE).
 
 ## Architecture Overview
 
